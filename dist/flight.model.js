@@ -10,10 +10,14 @@ const mongoose_paginate_1 = __importDefault(require("mongoose-paginate"));
 //AutoIncrement.initialize(mongoose.connection);
 let flightSchema = new mongoose_1.default.Schema({
     // FNumber: { type: Number, required: true },
-    departureDate: { type: String, required: true },
-    arrivingDate: { type: String, required: true },
+    duration: { type: String, required: true },
+    date: { type: Date, required: true },
+    returnDate: { type: Date, default: null },
     destination: { type: String, required: true },
+    departure: { type: String, required: true },
     price: { type: Number, required: true },
+    nbBuisPlaces: { type: Number, required: true },
+    nbEcoPlaces: { type: Number, required: true },
     imagePath: { type: String, required: true },
 });
 flightSchema.plugin(mongoose_paginate_1.default);

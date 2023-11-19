@@ -41,14 +41,18 @@ const upload = multer({ storage: storage }).single('image');
 app.post('/flights', upload, (req, res) => {
   console.log(req.file?.filename);
 
-  const { departureDate, arrivingDate, destination, price } = req.body;
+  const { duration,date,returnDate, departure, destination, price,nbBuisPlaces,nbEcoPlaces } = req.body;
   const imagePath = 'http://localhost:3000/images/' + req.file?.filename;
 
   const newFlight = new Flight({
-    departureDate,
-    arrivingDate,
+    duration,
+    date,
+    returnDate,
+    departure,
     destination,
     price,
+    nbBuisPlaces,
+    nbEcoPlaces,
     imagePath,
   });
 
@@ -86,11 +90,16 @@ app.put("/flights/:id", upload, (req: Request, resp: Response) => {
   const flightId = req.params.id;
 
   const updateObject: any = {};
-  updateObject.departureDate = req.body.departureDate;
-  updateObject.arrivingDate = req.body.arrivingDate;
+  updateObject.duration = req.body.duration;
+  updateObject.date = req.body.date;
+  if(req.body.returnDate) {  updateObject.returnDate = req.body.returnDate;
+  }else{  updateObject.returnDate = null;
+  }
+  updateObject.departure = req.body.departure;
   updateObject.destination = req.body.destination;
   updateObject.price = req.body.price;
-
+  updateObject.nbBuisPlaces = req.body.nbBuisPlaces;
+  updateObject.nbEcoPlaces = req.body.nbEcoPlaces;
   if (req.file) {
     updateObject.imagePath = 'http://localhost:3000/images/' + req.file.filename;
   }
@@ -100,7 +109,7 @@ app.put("/flights/:id", upload, (req: Request, resp: Response) => {
       console.error(err);
       resp.status(500).json({ error: "Internal Server Error" });
     } else {
-      resp.json({ message: "Flight updated successfully" });
+      resp.json(updateObject);
     }
     
   });
