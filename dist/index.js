@@ -63,7 +63,23 @@ app.post('/flights', upload, (req, res) => {
 app.get("/flights", (req, resp) => {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.size) || 10;
-    flight_model_1.default.paginate({}, { page: page, limit: pageSize }, (err, result) => {
+    const filter = {};
+    if (req.query.departure) {
+        filter.departure = req.query.departure;
+    }
+    if (req.query.destination) {
+        filter.destination = req.query.destination;
+    }
+    if (req.query.date) {
+        filter.date = req.query.date;
+    }
+    if (req.query.price) {
+        filter.price = req.query.price;
+    }
+    if (req.query.returnDate) {
+        filter.returnDate = req.query.returnDate;
+    }
+    flight_model_1.default.paginate(filter, { page: page, limit: pageSize }, (err, result) => {
         if (err) {
             resp.status(500).send(err);
         }
@@ -130,6 +146,26 @@ app.get('/flightsSearch', (req, res) => {
             res.status(500).send(err);
         else
             res.send(flights);
+    });
+});
+app.get("/destinations", (req, res) => {
+    flight_model_1.default.distinct("destination", (err, destinations) => {
+        if (err) {
+            res.status(500).send(err);
+        }
+        else {
+            res.json(destinations);
+        }
+    });
+});
+app.get("/departures", (req, res) => {
+    flight_model_1.default.distinct("departure", (err, departures) => {
+        if (err) {
+            res.status(500).send(err);
+        }
+        else {
+            res.json(departures);
+        }
     });
 });
 app.get("/", (req, resp) => {
