@@ -70,14 +70,37 @@ app.post('/flights', upload, (req, res) => {
 app.get("/flights", (req: Request, resp: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.size as string) || 10;
+  const filter: any = {};
 
-  Flight.paginate({}, { page: page, limit: pageSize }, (err, result) => {
+  if (req.query.departure) {
+    filter.departure = req.query.departure;
+  }
+
+  if (req.query.destination) {
+    filter.destination = req.query.destination;
+  }
+
+  if (req.query.date) {
+    filter.date = req.query.date;
+  }
+
+  if (req.query.price) {
+    filter.price = req.query.price;
+  }
+
+  if (req.query.returnDate) {
+    filter.returnDate = req.query.returnDate;
+  }
+
+
+  Flight.paginate(filter, { page: page, limit: pageSize }, (err, result) => {
     if (err) {
       resp.status(500).send(err);
     } else {
       resp.send(result);
     }
   });
+
 });
 
 app.get("/flights/:id", (req: Request, resp: Response) => {
@@ -138,7 +161,24 @@ app.get('/flightsSearch', (req: Request, res: Response) => {
     else res.send(flights);
   });
 });
-
+app.get("/destinations", (req, res) => {
+  Flight.distinct("destination", (err:any, destinations:any) => {
+    if (err) {
+      res.status(500).send(err);
+    } else {
+      res.json(destinations);
+    }
+  });
+});
+app.get("/departures", (req, res) => {
+  Flight.distinct("departure", (err:any, departures:any) => {
+    if (err) {
+      res.status(500).send(err);
+    } else {
+      res.json(departures);
+    }
+  });
+});
 app.get("/", (req, resp) => {
   resp.send("MCHA YACINE MCHA");
 });
