@@ -20,7 +20,7 @@ app.listen(PORT, () => {
 });
 eurekaHelper.registerWithEureka('flight-server', PORT);
 app.use(body_parser_1.default.json());
-const uri = "mongodb://127.0.0.1:27017/flight";
+const uri = "mongodb://127.0.0.1:27017/Flyware";
 mongoose_1.default.connect(uri, (err) => {
     if (err)
         console.log(err);
@@ -29,23 +29,27 @@ mongoose_1.default.connect(uri, (err) => {
 });
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'flights'); // Destination folder for uploaded files
+        cb(null, 'flights');
     },
     filename: (req, file, cb) => {
-        cb(null, file.originalname); // Rename the file if necessary
+        cb(null, `${Date.now()}_${file.originalname}`); // Rename the file if necessary
     },
 });
 const upload = multer({ storage: storage }).single('image');
 app.post('/flights', upload, (req, res) => {
     var _a, _b;
     console.log((_a = req.file) === null || _a === void 0 ? void 0 : _a.filename);
-    const { departureDate, arrivingDate, destination, price } = req.body;
+    const { duration, date, returnDate, departure, destination, price, nbBuisPlaces, nbEcoPlaces } = req.body;
     const imagePath = 'http://localhost:3000/images/' + ((_b = req.file) === null || _b === void 0 ? void 0 : _b.filename);
     const newFlight = new flight_model_1.default({
-        departureDate,
-        arrivingDate,
+        duration,
+        date,
+        returnDate,
+        departure,
         destination,
         price,
+        nbBuisPlaces,
+        nbEcoPlaces,
         imagePath,
     });
     newFlight.save((err, savedFlight) => {
@@ -79,10 +83,19 @@ app.get("/flights/:id", (req, resp) => {
 app.put("/flights/:id", upload, (req, resp) => {
     const flightId = req.params.id;
     const updateObject = {};
-    updateObject.departureDate = req.body.departureDate;
-    updateObject.arrivingDate = req.body.arrivingDate;
+    updateObject.duration = req.body.duration;
+    updateObject.date = req.body.date;
+    if (req.body.returnDate) {
+        updateObject.returnDate = req.body.returnDate;
+    }
+    else {
+        updateObject.returnDate = null;
+    }
+    updateObject.departure = req.body.departure;
     updateObject.destination = req.body.destination;
     updateObject.price = req.body.price;
+    updateObject.nbBuisPlaces = req.body.nbBuisPlaces;
+    updateObject.nbEcoPlaces = req.body.nbEcoPlaces;
     if (req.file) {
         updateObject.imagePath = 'http://localhost:3000/images/' + req.file.filename;
     }
@@ -92,7 +105,7 @@ app.put("/flights/:id", upload, (req, resp) => {
             resp.status(500).json({ error: "Internal Server Error" });
         }
         else {
-            resp.json({ message: "Flight updated successfully" });
+            resp.json(updateObject);
         }
     });
 });
