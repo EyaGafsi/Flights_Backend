@@ -41,14 +41,18 @@ const upload = multer({ storage: storage }).single('image');
 app.post('/flights', upload, (req, res) => {
   console.log(req.file?.filename);
 
-  const { departureDate, arrivingDate, destination, price } = req.body;
+  const { duration,date,returnDate, departure, destination, price,nbBuisPlaces,nbEcoPlaces } = req.body;
   const imagePath = 'http://localhost:3000/images/' + req.file?.filename;
 
   const newFlight = new Flight({
-    departureDate,
-    arrivingDate,
+    duration,
+    date,
+    returnDate,
+    departure,
     destination,
     price,
+    nbBuisPlaces,
+    nbEcoPlaces,
     imagePath,
   });
 
@@ -66,14 +70,37 @@ app.post('/flights', upload, (req, res) => {
 app.get("/flights", (req: Request, resp: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.size as string) || 10;
+  const filter: any = {};
 
-  Flight.paginate({}, { page: page, limit: pageSize }, (err, result) => {
+  if (req.query.departure) {
+    filter.departure = req.query.departure;
+  }
+
+  if (req.query.destination) {
+    filter.destination = req.query.destination;
+  }
+
+  if (req.query.date) {
+    filter.date = req.query.date;
+  }
+
+  if (req.query.price) {
+    filter.price = req.query.price;
+  }
+
+  if (req.query.returnDate) {
+    filter.returnDate = req.query.returnDate;
+  }
+
+
+  Flight.paginate(filter, { page: page, limit: pageSize }, (err, result) => {
     if (err) {
       resp.status(500).send(err);
     } else {
       resp.send(result);
     }
   });
+
 });
 
 app.get("/flights/:id", (req: Request, resp: Response) => {
@@ -86,11 +113,16 @@ app.put("/flights/:id", upload, (req: Request, resp: Response) => {
   const flightId = req.params.id;
 
   const updateObject: any = {};
-  updateObject.departureDate = req.body.departureDate;
-  updateObject.arrivingDate = req.body.arrivingDate;
+  updateObject.duration = req.body.duration;
+  updateObject.date = req.body.date;
+  if(req.body.returnDate) {  updateObject.returnDate = req.body.returnDate;
+  }else{  updateObject.returnDate = null;
+  }
+  updateObject.departure = req.body.departure;
   updateObject.destination = req.body.destination;
   updateObject.price = req.body.price;
-
+  updateObject.nbBuisPlaces = req.body.nbBuisPlaces;
+  updateObject.nbEcoPlaces = req.body.nbEcoPlaces;
   if (req.file) {
     updateObject.imagePath = 'http://localhost:3000/images/' + req.file.filename;
   }
@@ -100,7 +132,7 @@ app.put("/flights/:id", upload, (req: Request, resp: Response) => {
       console.error(err);
       resp.status(500).json({ error: "Internal Server Error" });
     } else {
-      resp.json({ message: "Flight updated successfully" });
+      resp.json(updateObject);
     }
     
   });
@@ -129,7 +161,24 @@ app.get('/flightsSearch', (req: Request, res: Response) => {
     else res.send(flights);
   });
 });
-
+app.get("/destinations", (req, res) => {
+  Flight.distinct("destination", (err:any, destinations:any) => {
+    if (err) {
+      res.status(500).send(err);
+    } else {
+      res.json(destinations);
+    }
+  });
+});
+app.get("/departures", (req, res) => {
+  Flight.distinct("departure", (err:any, departures:any) => {
+    if (err) {
+      res.status(500).send(err);
+    } else {
+      res.json(departures);
+    }
+  });
+});
 app.get("/", (req, resp) => {
   resp.send("MCHA YACINE MCHA");
 });
