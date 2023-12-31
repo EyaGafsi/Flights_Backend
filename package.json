@@ -26,6 +26,8 @@
   },
   "dependencies": {
     "eureka-js-client": "^4.5.0",
+    "express-session": "^1.17.3",
+    "keycloak-connect": "23.0.3",
     "mongoose-auto-increment": "^5.0.1",
     "multer": "^1.4.5-lts.1"
   }

@@ -7,9 +7,29 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 
+const session = require('express-session');
+const Keycloak = require('keycloak-connect');
 
+const memoryStore = new session.MemoryStore();
+const kcConfig = {
+  clientId: 'flyware-client',
+  bearerOnly: true,
+  serverUrl: 'http://localhost:8080',
+  realm: 'Flyware-Realm',
+  publicClient: true
+};
+
+const keycloak = new Keycloak({ store: memoryStore }, kcConfig);
 const app = express();
 app.use(cors());
+app.use(session({
+  secret: 'my-secret',
+  resave: false,
+  saveUninitialized: true,
+  store: memoryStore,
+}));
+
+app.use(keycloak.middleware()); 
 app.use('/images', express.static(path.join(__dirname, '../flights')));
 const PORT = process.env.PORT || 3000;
 const eurekaHelper = require('./eureka-helper');
@@ -103,6 +123,20 @@ app.get("/flights", (req: Request, resp: Response) => {
 
 });
 
+app.get("/flightsList", keycloak.protect( 'realm:admin' ), (req: Request, resp: Response) => {
+  const page = parseInt(req.query.page as string) || 1;
+  const pageSize = parseInt(req.query.size as string) || 10;
+
+
+  Flight.paginate("", { page: page, limit: pageSize }, (err, result) => {
+    if (err) {
+      resp.status(500).send(err);
+    } else {
+      resp.send(result);
+    }
+  });
+
+});
 app.get("/flights/:id", (req: Request, resp: Response) => {
   Flight.findById(req.params.id, (err: any, flight: any) => {
     if (err) resp.status(500).send(err);

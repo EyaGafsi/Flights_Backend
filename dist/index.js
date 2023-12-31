@@ -10,8 +10,26 @@ const body_parser_1 = __importDefault(require("body-parser"));
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
+const session = require('express-session');
+const Keycloak = require('keycloak-connect');
+const memoryStore = new session.MemoryStore();
+const kcConfig = {
+    clientId: 'flyware-client',
+    bearerOnly: true,
+    serverUrl: 'http://localhost:8080',
+    realm: 'Flyware-Realm',
+    publicClient: true
+};
+const keycloak = new Keycloak({ store: memoryStore }, kcConfig);
 const app = (0, express_1.default)();
 app.use(cors());
+app.use(session({
+    secret: 'my-secret',
+    resave: false,
+    saveUninitialized: true,
+    store: memoryStore,
+}));
+app.use(keycloak.middleware());
 app.use('/images', express_1.default.static(path.join(__dirname, '../flights')));
 const PORT = process.env.PORT || 3000;
 const eurekaHelper = require('./eureka-helper');
@@ -80,6 +98,18 @@ app.get("/flights", (req, resp) => {
         filter.returnDate = req.query.returnDate;
     }
     flight_model_1.default.paginate(filter, { page: page, limit: pageSize }, (err, result) => {
+        if (err) {
+            resp.status(500).send(err);
+        }
+        else {
+            resp.send(result);
+        }
+    });
+});
+app.get("/flightsList", keycloak.protect('realm:admin'), (req, resp) => {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.size) || 10;
+    flight_model_1.default.paginate("", { page: page, limit: pageSize }, (err, result) => {
         if (err) {
             resp.status(500).send(err);
         }
