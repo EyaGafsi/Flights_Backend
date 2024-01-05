@@ -226,18 +226,6 @@ app.delete("/flights/:id", (req, resp) => {
         }
     });
 });
-app.get('/flightsSearch', (req, res) => {
-    var _a, _b;
-    const search = req.query.search || '';
-    const page = parseInt(((_a = req.query.page) === null || _a === void 0 ? void 0 : _a.toString()) || '1');
-    const size = parseInt(((_b = req.query.size) === null || _b === void 0 ? void 0 : _b.toString()) || '5');
-    flight_model_1.default.paginate({ title: { $regex: ".*(?i)" + search + ".*" } }, { page: page, limit: size }, (err, flights) => {
-        if (err)
-            res.status(500).send(err);
-        else
-            res.send(flights);
-    });
-});
 app.get("/destinations", (req, res) => {
     flight_model_1.default.distinct("destination", (err, destinations) => {
         if (err) {

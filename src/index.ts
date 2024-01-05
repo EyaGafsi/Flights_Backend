@@ -231,16 +231,6 @@ app.delete("/flights/:id", (req: Request, resp: Response) => {
 });
 
 
-app.get('/flightsSearch', (req: Request, res: Response) => {
-  const search = req.query.search || '';
-  const page: number = parseInt(req.query.page?.toString() || '1');
-  const size: number = parseInt(req.query.size?.toString() || '5');
-
-  Flight.paginate({ title: { $regex: ".*(?i)" + search + ".*" } }, { page: page, limit: size }, (err: any, flights: any) => {
-    if (err) res.status(500).send(err);
-    else res.send(flights);
-  });
-});
 app.get("/destinations", (req, res) => {
   Flight.distinct("destination", (err:any, destinations:any) => {
     if (err) {
