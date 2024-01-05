@@ -85,12 +85,14 @@ app.post('/flights', upload, (req, res) => {
   });
 });
 
-
-
-app.get("/flights", (req: Request, resp: Response) => {
+app.get("/flights", async (req: Request, resp: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.size as string) || 10;
   const filter: any = {};
+  const nbPlaces = parseInt(req.query.nbPlaces as string);
+  const type = req.query.type as string;
+  const minPrice = parseInt(req.query.minPrice as string);
+  const maxPrice = parseInt(req.query.maxPrice as string);
 
   if (req.query.departure) {
     filter.departure = req.query.departure;
@@ -104,23 +106,67 @@ app.get("/flights", (req: Request, resp: Response) => {
     filter.date = req.query.date;
   }
 
-  if (req.query.price) {
-    filter.price = req.query.price;
-  }
-
   if (req.query.returnDate) {
     filter.returnDate = req.query.returnDate;
   }
 
-
-  Flight.paginate(filter, { page: page, limit: pageSize }, (err, result) => {
-    if (err) {
-      resp.status(500).send(err);
+  try {
+    let result: any = {};
+if(nbPlaces){
+    if (type === 'business') {
+      result = {
+           nbBuisPlaces: { $gte: nbPlaces }
+        
+      };
+    } else if (type === 'economic') {
+      result = {
+        nbEcoPlaces: { $gte: nbPlaces }
+      };
     } else {
-      resp.send(result);
+      result = {
+        $or: [
+          { nbBuisPlaces: { $gte: nbPlaces } },
+          { nbEcoPlaces: { $gte: nbPlaces } }
+        ]
+      };
+    }}else {
+      if (type === 'business') {
+        result = {
+             nbBuisPlaces: { $gt: 0 }
+          
+        };
+      } else if (type === 'economic') {
+        result = {
+          nbEcoPlaces: { $gt: 0 }
+        };
+      }
     }
-  });
+    if (minPrice) {
+      filter.price = { $gte: minPrice };
+    }
+    
+    if (maxPrice) {
+      filter.price = { ...filter.price, $lte: maxPrice };
+    }
+const options = {
+  page: page,
+  limit: pageSize
+};
 
+const query = Flight.find({...result,...filter});
+Flight.paginate(query, options, (err, resultat) => {
+  if (err) {
+    resp.status(500).send(err);
+  } else {
+    console.log('Pagination Result:', resultat);
+    resp.send(resultat);
+  }
+});
+
+  
+  } catch (err) {
+    resp.status(500).json({ message: 'Error fetching flights', error: err });
+  }
 });
 
 app.get("/flightsList", keycloak.protect( 'realm:admin' ), (req: Request, resp: Response) => {

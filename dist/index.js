@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -78,10 +87,14 @@ app.post('/flights', upload, (req, res) => {
         res.status(201).json(savedFlight);
     });
 });
-app.get("/flights", (req, resp) => {
+app.get("/flights", (req, resp) => __awaiter(void 0, void 0, void 0, function* () {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.size) || 10;
     const filter = {};
+    const nbPlaces = parseInt(req.query.nbPlaces);
+    const type = req.query.type;
+    const minPrice = parseInt(req.query.minPrice);
+    const maxPrice = parseInt(req.query.maxPrice);
     if (req.query.departure) {
         filter.departure = req.query.departure;
     }
@@ -91,21 +104,68 @@ app.get("/flights", (req, resp) => {
     if (req.query.date) {
         filter.date = req.query.date;
     }
-    if (req.query.price) {
-        filter.price = req.query.price;
-    }
     if (req.query.returnDate) {
         filter.returnDate = req.query.returnDate;
     }
-    flight_model_1.default.paginate(filter, { page: page, limit: pageSize }, (err, result) => {
-        if (err) {
-            resp.status(500).send(err);
+    try {
+        let result = {};
+        if (nbPlaces) {
+            if (type === 'business') {
+                result = {
+                    nbBuisPlaces: { $gte: nbPlaces }
+                };
+            }
+            else if (type === 'economic') {
+                result = {
+                    nbEcoPlaces: { $gte: nbPlaces }
+                };
+            }
+            else {
+                result = {
+                    $or: [
+                        { nbBuisPlaces: { $gte: nbPlaces } },
+                        { nbEcoPlaces: { $gte: nbPlaces } }
+                    ]
+                };
+            }
         }
         else {
-            resp.send(result);
+            if (type === 'business') {
+                result = {
+                    nbBuisPlaces: { $gt: 0 }
+                };
+            }
+            else if (type === 'economic') {
+                result = {
+                    nbEcoPlaces: { $gt: 0 }
+                };
+            }
         }
-    });
-});
+        if (minPrice) {
+            filter.price = { $gte: minPrice };
+        }
+        if (maxPrice) {
+            filter.price = Object.assign(Object.assign({}, filter.price), { $lte: maxPrice });
+        }
+        const options = {
+            page: page,
+            limit: pageSize
+        };
+        const query = flight_model_1.default.find(Object.assign(Object.assign({}, result), filter));
+        flight_model_1.default.paginate(query, options, (err, resultat) => {
+            if (err) {
+                resp.status(500).send(err);
+            }
+            else {
+                console.log('Pagination Result:', resultat);
+                resp.send(resultat);
+            }
+        });
+    }
+    catch (err) {
+        resp.status(500).json({ message: 'Error fetching flights', error: err });
+    }
+}));
 app.get("/flightsList", keycloak.protect('realm:admin'), (req, resp) => {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.size) || 10;
