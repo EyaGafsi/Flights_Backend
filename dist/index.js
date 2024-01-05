@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -10,8 +19,26 @@ const body_parser_1 = __importDefault(require("body-parser"));
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
+const session = require('express-session');
+const Keycloak = require('keycloak-connect');
+const memoryStore = new session.MemoryStore();
+const kcConfig = {
+    clientId: 'flyware-client',
+    bearerOnly: true,
+    serverUrl: 'http://localhost:8080',
+    realm: 'Flyware-Realm',
+    publicClient: true
+};
+const keycloak = new Keycloak({ store: memoryStore }, kcConfig);
 const app = (0, express_1.default)();
 app.use(cors());
+app.use(session({
+    secret: 'my-secret',
+    resave: false,
+    saveUninitialized: true,
+    store: memoryStore,
+}));
+app.use(keycloak.middleware());
 app.use('/images', express_1.default.static(path.join(__dirname, '../flights')));
 const PORT = process.env.PORT || 3000;
 const eurekaHelper = require('./eureka-helper');
@@ -60,10 +87,14 @@ app.post('/flights', upload, (req, res) => {
         res.status(201).json(savedFlight);
     });
 });
-app.get("/flights", (req, resp) => {
+app.get("/flights", (req, resp) => __awaiter(void 0, void 0, void 0, function* () {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.size) || 10;
     const filter = {};
+    const nbPlaces = parseInt(req.query.nbPlaces);
+    const type = req.query.type;
+    const minPrice = parseInt(req.query.minPrice);
+    const maxPrice = parseInt(req.query.maxPrice);
     if (req.query.departure) {
         filter.departure = req.query.departure;
     }
@@ -73,13 +104,72 @@ app.get("/flights", (req, resp) => {
     if (req.query.date) {
         filter.date = req.query.date;
     }
-    if (req.query.price) {
-        filter.price = req.query.price;
-    }
     if (req.query.returnDate) {
         filter.returnDate = req.query.returnDate;
     }
-    flight_model_1.default.paginate(filter, { page: page, limit: pageSize }, (err, result) => {
+    try {
+        let result = {};
+        if (nbPlaces) {
+            if (type === 'business') {
+                result = {
+                    nbBuisPlaces: { $gte: nbPlaces }
+                };
+            }
+            else if (type === 'economic') {
+                result = {
+                    nbEcoPlaces: { $gte: nbPlaces }
+                };
+            }
+            else {
+                result = {
+                    $or: [
+                        { nbBuisPlaces: { $gte: nbPlaces } },
+                        { nbEcoPlaces: { $gte: nbPlaces } }
+                    ]
+                };
+            }
+        }
+        else {
+            if (type === 'business') {
+                result = {
+                    nbBuisPlaces: { $gt: 0 }
+                };
+            }
+            else if (type === 'economic') {
+                result = {
+                    nbEcoPlaces: { $gt: 0 }
+                };
+            }
+        }
+        if (minPrice) {
+            filter.price = { $gte: minPrice };
+        }
+        if (maxPrice) {
+            filter.price = Object.assign(Object.assign({}, filter.price), { $lte: maxPrice });
+        }
+        const options = {
+            page: page,
+            limit: pageSize
+        };
+        const query = flight_model_1.default.find(Object.assign(Object.assign({}, result), filter));
+        flight_model_1.default.paginate(query, options, (err, resultat) => {
+            if (err) {
+                resp.status(500).send(err);
+            }
+            else {
+                console.log('Pagination Result:', resultat);
+                resp.send(resultat);
+            }
+        });
+    }
+    catch (err) {
+        resp.status(500).json({ message: 'Error fetching flights', error: err });
+    }
+}));
+app.get("/flightsList", keycloak.protect('realm:admin'), (req, resp) => {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.size) || 10;
+    flight_model_1.default.paginate("", { page: page, limit: pageSize }, (err, result) => {
         if (err) {
             resp.status(500).send(err);
         }
@@ -134,18 +224,6 @@ app.delete("/flights/:id", (req, resp) => {
         else {
             resp.json({ message: "Flight deleted successfully" });
         }
-    });
-});
-app.get('/flightsSearch', (req, res) => {
-    var _a, _b;
-    const search = req.query.search || '';
-    const page = parseInt(((_a = req.query.page) === null || _a === void 0 ? void 0 : _a.toString()) || '1');
-    const size = parseInt(((_b = req.query.size) === null || _b === void 0 ? void 0 : _b.toString()) || '5');
-    flight_model_1.default.paginate({ title: { $regex: ".*(?i)" + search + ".*" } }, { page: page, limit: size }, (err, flights) => {
-        if (err)
-            res.status(500).send(err);
-        else
-            res.send(flights);
     });
 });
 app.get("/destinations", (req, res) => {

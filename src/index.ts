@@ -7,9 +7,29 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 
+const session = require('express-session');
+const Keycloak = require('keycloak-connect');
 
+const memoryStore = new session.MemoryStore();
+const kcConfig = {
+  clientId: 'flyware-client',
+  bearerOnly: true,
+  serverUrl: 'http://localhost:8080',
+  realm: 'Flyware-Realm',
+  publicClient: true
+};
+
+const keycloak = new Keycloak({ store: memoryStore }, kcConfig);
 const app = express();
 app.use(cors());
+app.use(session({
+  secret: 'my-secret',
+  resave: false,
+  saveUninitialized: true,
+  store: memoryStore,
+}));
+
+app.use(keycloak.middleware()); 
 app.use('/images', express.static(path.join(__dirname, '../flights')));
 const PORT = process.env.PORT || 3000;
 const eurekaHelper = require('./eureka-helper');
@@ -65,12 +85,14 @@ app.post('/flights', upload, (req, res) => {
   });
 });
 
-
-
-app.get("/flights", (req: Request, resp: Response) => {
+app.get("/flights", async (req: Request, resp: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.size as string) || 10;
   const filter: any = {};
+  const nbPlaces = parseInt(req.query.nbPlaces as string);
+  const type = req.query.type as string;
+  const minPrice = parseInt(req.query.minPrice as string);
+  const maxPrice = parseInt(req.query.maxPrice as string);
 
   if (req.query.departure) {
     filter.departure = req.query.departure;
@@ -84,16 +106,75 @@ app.get("/flights", (req: Request, resp: Response) => {
     filter.date = req.query.date;
   }
 
-  if (req.query.price) {
-    filter.price = req.query.price;
-  }
-
   if (req.query.returnDate) {
     filter.returnDate = req.query.returnDate;
   }
 
+  try {
+    let result: any = {};
+if(nbPlaces){
+    if (type === 'business') {
+      result = {
+           nbBuisPlaces: { $gte: nbPlaces }
+        
+      };
+    } else if (type === 'economic') {
+      result = {
+        nbEcoPlaces: { $gte: nbPlaces }
+      };
+    } else {
+      result = {
+        $or: [
+          { nbBuisPlaces: { $gte: nbPlaces } },
+          { nbEcoPlaces: { $gte: nbPlaces } }
+        ]
+      };
+    }}else {
+      if (type === 'business') {
+        result = {
+             nbBuisPlaces: { $gt: 0 }
+          
+        };
+      } else if (type === 'economic') {
+        result = {
+          nbEcoPlaces: { $gt: 0 }
+        };
+      }
+    }
+    if (minPrice) {
+      filter.price = { $gte: minPrice };
+    }
+    
+    if (maxPrice) {
+      filter.price = { ...filter.price, $lte: maxPrice };
+    }
+const options = {
+  page: page,
+  limit: pageSize
+};
 
-  Flight.paginate(filter, { page: page, limit: pageSize }, (err, result) => {
+const query = Flight.find({...result,...filter});
+Flight.paginate(query, options, (err, resultat) => {
+  if (err) {
+    resp.status(500).send(err);
+  } else {
+    console.log('Pagination Result:', resultat);
+    resp.send(resultat);
+  }
+});
+
+  
+  } catch (err) {
+    resp.status(500).json({ message: 'Error fetching flights', error: err });
+  }
+});
+
+app.get("/flightsList", keycloak.protect( 'realm:admin' ), (req: Request, resp: Response) => {
+  const page = parseInt(req.query.page as string) || 1;
+  const pageSize = parseInt(req.query.size as string) || 10;
+
+
+  Flight.paginate("", { page: page, limit: pageSize }, (err, result) => {
     if (err) {
       resp.status(500).send(err);
     } else {
@@ -102,7 +183,6 @@ app.get("/flights", (req: Request, resp: Response) => {
   });
 
 });
-
 app.get("/flights/:id", (req: Request, resp: Response) => {
   Flight.findById(req.params.id, (err: any, flight: any) => {
     if (err) resp.status(500).send(err);
@@ -151,16 +231,6 @@ app.delete("/flights/:id", (req: Request, resp: Response) => {
 });
 
 
-app.get('/flightsSearch', (req: Request, res: Response) => {
-  const search = req.query.search || '';
-  const page: number = parseInt(req.query.page?.toString() || '1');
-  const size: number = parseInt(req.query.size?.toString() || '5');
-
-  Flight.paginate({ title: { $regex: ".*(?i)" + search + ".*" } }, { page: page, limit: size }, (err: any, flights: any) => {
-    if (err) res.status(500).send(err);
-    else res.send(flights);
-  });
-});
 app.get("/destinations", (req, res) => {
   Flight.distinct("destination", (err:any, destinations:any) => {
     if (err) {
