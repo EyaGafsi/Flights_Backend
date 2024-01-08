@@ -58,7 +58,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage }).single('image');
-app.post('/flights', upload, (req, res) => {
+app.post('/flights',keycloak.protect('realm:admin'), upload, (req, res) => {
   console.log(req.file?.filename);
 
   const { duration,date,returnDate, departure, destination, price,nbBuisPlaces,nbEcoPlaces } = req.body;
@@ -189,7 +189,7 @@ app.get("/flights/:id", (req: Request, resp: Response) => {
     else resp.send(flight);
   });
 });
-app.put("/flights/:id", upload, (req: Request, resp: Response) => {
+app.put("/flights/:id", keycloak.protect( 'realm:admin' ), upload, (req: Request, resp: Response) => {
   const flightId = req.params.id;
 
   const updateObject: any = {};
@@ -219,7 +219,7 @@ app.put("/flights/:id", upload, (req: Request, resp: Response) => {
 });
 
 
-app.delete("/flights/:id", (req: Request, resp: Response) => {
+app.delete("/flights/:id", keycloak.protect( 'realm:admin' ), (req: Request, resp: Response) => {
   Flight.findByIdAndDelete(req.params.id, req.body, (err: any) => {
     if (err) {
       console.error(err);
